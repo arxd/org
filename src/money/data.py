@@ -1,4 +1,7 @@
 """
+	Just some general discussion / brainstorming...
+	----------------
+
         We are interested in how our value is moving around, going up, going
         down. But, we can only track what quantities we have.
 
@@ -64,6 +67,57 @@
 from datetime import date
 
 
+class Market(object):
+	""" Repositories only have value relative to other repositories.  
+	So you go to the market to get the value of a repo.
+	One market holds the temporal trade values between two units
+	  * USD vs. JPY
+	  * Bus vs. USD
+	The market values can come from the internet (currencies / stocks)
+	or you can define your own values and load them from a file.
+	
+	If you define market values for future dates then you can speculate
+	about the future.  Values are interperated linearly between dates.
+	"""
+	def __init__(self):
+		self.unitA = unitA
+		self.unitB = unitB
+		self.points = [] # an array of (time, ratio[unitA/unitB] ) tuples
+		
+	def load(self, url):
+		""" Load market data from filename  file://asdfasdfasdf
+			or Load data from a url http:// basdfasdfa
+			
+			This method will be overridden in sub classes to implement different data locations
+		"""
+		pass
+
+	def trade(self, value, from_unit, to_unit, time=None):
+		""" Convert value \a from_units \a to_units at \a time.
+		The default time is today
+		"""
+		if not time:
+			time = date.today()
+			
+		# figure out which way we are trading
+		if from_unit == self.unitA and to_unit == self.unitB:
+			ratio_exp = -1.0 # value_A *  (B/A)
+		elif from_unit == self.unitB and to_unit == self.unitA:
+			ratio_exp = 1.0 # value_B * (A/B)
+		else:
+			raise Exception("This Market (%s, %s) cant trade (%s, %s)"%(self.unitA, self.unitB, from_unit, to_unit))
+		
+		# Search for the correct trade value
+		return value * (self.get_ratio(time, 0, len(self.points)) ** ration_exp)
+
+	def find_ratio(self, t, idx_from, idx_to):
+		""" A binary search for \a t """
+		#~ if idx_from >= idx_to:
+			#~ if idx_from >= len(self.points):
+				#~ return self.points[-1][1]
+		#~ idx_mid = (idx_to - idx_from)//2 + idx_from
+		#~ if self.points[idx_mid][0]
+
 class Repo(object):
 	""" A Repo (Repository) is a place where 'value' is kept.  It has an integer quantity of 'stuff'.  
 	It is kept as an integer to avoid flotaing point imprecision and ensure exact math.
@@ -79,14 +133,19 @@ class Repo(object):
 		self.quantity = 0 # This is an integer value of quantity, 1 bus, 200 cents,  3 acre of land, etc.
 		self.mine = mine # is this repository owned by me?
 		self.units = units # what is quantity counting?
-		self.assessments = [(date(1900, 1, 1), self.units, 1.0)] # list of tuples (time, other_unit, ratio (other_unit / this_unit)
 		
-	def get_value(self, other_units=None):
+	def get_value(self, other_units=None, when=None):
 		""" Get the value of this repo in terms of some other units or self.units (default).
+		Since value changes with time you can specefy \a when.  It defaults to today.
 		"""
+		if not when:
+			when = date.today()
 		if not other_units:
 			other_units = self.units
-		pass
+		
+		# Check our assessments 
+		
+		
 		
 	def assess_value(self, value_ratio, other_units="USD", when=None):
 		""" Asses the value of this repository in terms of other_units as a ratio other_unit / this_unit

@@ -16,13 +16,13 @@ Start with a fresh cloned repository:
 
   1. Look for new updates on github and merge those changes into your local repo
   
-    > **git fetch**
+    > **git fetch**  
     > **git merge**
     
   2. Make some local changes of your own.  Compile and test.
   3. Stage some changes and commit them (locally)
   
-    > **git add -p**
+    > **git add -p**  
     > **git commit -m "A helpful message about the changes you made"**
     
   4. Repeat from step #2

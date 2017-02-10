@@ -7,13 +7,23 @@ Things to organize
  * Health
  * Food
 
-# How to code with git
+# Getting Started
+Start with a fresh cloned repository:
+  
+  git clone https://github.com/arxd/org.git
 
- 1. Check out the source from git.
-    * git clone https://github.com/arxd/org.git
-    
-  2. Make some local changes changes
-  3. Commit your changes
-     * 
-    
+# Coding workflow
+
+  1. Look for new updates on github and merge those changes into your local repo
+    git fetch
+    git merge
+  2. Make some local changes of your own.
+  3. Compile and Test
+  4. Commit your changes (locally)
+    git add *
+    git commit -m "A helpful message about the changes you made"
+  5. Repeat from step #2
+  6. When you are ready, push the changes up to github
+    git push
+  7. Repeat from step #1
 

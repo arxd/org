@@ -1,6 +1,6 @@
 """
-	Just some general discussion / brainstorming...
-	----------------
+	Just some general discussion / brainstorming / motivations..
+	===================================
 
         We are interested in how our value is moving around, going up, going
         down. But, we can only track what quantities we have.
@@ -68,7 +68,8 @@ from datetime import date
 
 
 class Market(object):
-	""" Repositories only have value relative to other repositories.  
+	"""
+	Repositories only have value relative to other repositories.  
 	So you go to the market to get the value of a repo.
 	One market holds the temporal trade values between two units
 	  * USD vs. JPY
@@ -79,81 +80,101 @@ class Market(object):
 	If you define market values for future dates then you can speculate
 	about the future.  Values are interperated linearly between dates.
 	"""
-	def __init__(self):
+	def __init__(self, unitA, unitB):
 		self.unitA = unitA
 		self.unitB = unitB
-		self.points = [] # an array of (time, ratio[unitA/unitB] ) tuples
+		self.points = [] # an array of tuples:  (time, amt_unitA, amt_unitB).  Sorted by time (earliest first).
 		
 	def load(self, url):
-		""" Load market data from filename  file://asdfasdfasdf
+		""" 
+		Load market data from filename  file://asdfasdfasdf
 			or Load data from a url http:// basdfasdfa
 			
 			This method will be overridden in sub classes to implement different data locations
 		"""
 		pass
 
-	def trade(self, value, from_unit, to_unit, time=None):
-		""" Convert value \a from_units \a to_units at \a time.
+	def trade(self, value, unit, time=None):
+		""" 
+		Convert value \a from_units \a to_units at \a time.
 		The default time is today
+		"""
+		# figure out which way we are trading
+		if unit == self.unitA:
+			ratio_exp = -1.0 # value_A *  (B/A)
+		elif unit == self.unitB:
+			ratio_exp = 1.0 # value_B * (A/B)
+		else:
+			raise Exception("This Market (%s, %s) can't trade %s"%(self.unitA, self.unitB, unit))
+		
+		# Search for the correct trade value
+		return value * (self.get_ratio(time) ** ratio_exp)
+
+	def get_ratio(self, time=None):
+		"""
+		Get a converstion ratio (unitA/unitB) at \a time.  The default time is today.
+		"""
+		if len(self.points) == 0:
+			raise Exception("This market has no assesment data.")
+		if not time:
+			time = today()
+		i = 0
+		while i < len(self.points) and time > self.points[i][0]:
+			i += 1
+		if i == len(self.points): # Asking about the future.  Use the latest known value
+			return self.points[-1][1] / self.points[-1][2]
+		if i == 0: # Asking at a time before our first assessment
+			raise Exception("This market has no defined value before %s"%(str(self.points[0][0])))
+		# Linearly interpolate between the two points
+		dA = self.points[i][1] - self.points[i-1][1]
+		dB = self.points[i][2] - self.points[i-1][2]
+		frac = (time - self.points[i-1][0]).days() / (self.points[i][0] - self.points[i-1][0]).days()
+		return (self.points[i-1][1] + frac*dA) / (self.points[i-1][2] + frac*dB)
+		
+	def assess(self, amt_unitA, amt_unitB, time=None):
+		""" 
+		Assess \a amt_unitA as \a amt_unitB.  Time defaults to today.
+		
+		market = Market("PrevostBus", "USD")
+		market.assess(1, 5000000) # 1 Bus == $50,000.00
 		"""
 		if not time:
 			time = date.today()
-			
-		# figure out which way we are trading
-		if from_unit == self.unitA and to_unit == self.unitB:
-			ratio_exp = -1.0 # value_A *  (B/A)
-		elif from_unit == self.unitB and to_unit == self.unitA:
-			ratio_exp = 1.0 # value_B * (A/B)
-		else:
-			raise Exception("This Market (%s, %s) cant trade (%s, %s)"%(self.unitA, self.unitB, from_unit, to_unit))
-		
-		# Search for the correct trade value
-		return value * (self.get_ratio(time, 0, len(self.points)) ** ration_exp)
+		# insert in sorted order
+		i = len(self.points)  # search backward to give O(n) for sorted data
+		while i > 0 and time < self.points[i-1][0]:
+			i -= 1
+		if i and self.points[i-1][0] == time:
+			raise Exception("Cannot have two different assessments on the same day")
+		self.points.insert(i, (time, amt_unitA, amt_unitB))
 
-	def find_ratio(self, t, idx_from, idx_to):
-		""" A binary search for \a t """
-		#~ if idx_from >= idx_to:
-			#~ if idx_from >= len(self.points):
-				#~ return self.points[-1][1]
-		#~ idx_mid = (idx_to - idx_from)//2 + idx_from
-		#~ if self.points[idx_mid][0]
 
 class Repo(object):
-	""" A Repo (Repository) is a place where 'value' is kept.  It has an integer quantity of 'stuff'.  
+	""" 
+	A Repo (Repository) is a place where 'value' is kept.  It has an integer quantity of 'stuff'.  
 	It is kept as an integer to avoid flotaing point imprecision and ensure exact math.
 	If the quantity is 1 then that means this is indivisible (like a house, or a dog).
 	Otherwise, parts of this repository can be transfered to another repository.
 	
-	An credit card account would be represented by a Repo that is not owned by you (someone elses money)
+	A credit card account would be represented by a Repo that is not owned by you (someone elses money)
 	A company (Walmart) would also be a Repo not owned by you.
 	"""
 	def __init__(self, name, frac_digits=2, units="USD", mine=False):
 		self.name = name  # Bus, Scooter, Capital One Checking, Cash, etc.
-		self.frac_digits = frac_digits # Since quantity is an integer only this tells us how many of those digits are fractional parts.  USD:2, JPY:0,  etc.
-		self.quantity = 0 # This is an integer value of quantity, 1 bus, 200 cents,  3 acre of land, etc.
+		self.frac_digits = frac_digits # Since quantity is an integer, this tells us how many of those digits are fractional parts.  USD:2, JPY:0,  etc.
+		self.quantity = 0 # This is an integer value of quantity, 1 bus, 200 cents,  3000000 cm^2 of land, etc.
 		self.mine = mine # is this repository owned by me?
-		self.units = units # what is quantity counting?
+		self.units = units # what is quantity counting? (DeckerPrarieAcres, USD, Bitcoin, Bus, Scooter)
 		
-	def get_value(self, other_units=None, when=None):
-		""" Get the value of this repo in terms of some other units or self.units (default).
+	def get_value(self, market=None, when=None):
+		""" Get the value of this repo from the \a market.
 		Since value changes with time you can specefy \a when.  It defaults to today.
 		"""
-		if not when:
-			when = date.today()
-		if not other_units:
-			other_units = self.units
-		
-		# Check our assessments 
-		
-		
-		
-	def assess_value(self, value_ratio, other_units="USD", when=None):
-		""" Asses the value of this repository in terms of other_units as a ratio other_unit / this_unit
-		"""
-		if not when:
-			when = date.today()
-		self.assessments.append( (when, other_units, value_ratio) )
-		
+		if not market:
+			return self.quantity
+		# use the market
+		return market.trade(self.quantity, self.units, when)
+
 
 class Transfer(object):
 	""" We keep track of value moving between Repositories.

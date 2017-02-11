@@ -76,20 +76,6 @@ class DateJSON(json.JSONEncoder, json.JSONDecoder):
 			return obj.strftime("%Y-%m-%d %H:%M:%Sz")
 		return json.JSONEncoder.default(self, obj)
 
-#~ class DateJSONDecode(json.JSONDecoder):
-	
-	#~ def decode(self, s):
-		#~ print("DECODE:"+s)
-		#~ if len(s) > 20:
-			#~ return json.JSONDecoder.decode(self, s) 
-		#~ try:
-			#~ return datetime.strptime(s, DateJSON.DATETIME_FMT)
-		#~ except ValueError:
-			#~ try:
-				#~ return datetime.strptime(s, DateJSON.DATE_FMT).date()
-			#~ except ValueError:
-				#~ return json.JSONDecoder.decode(self, s)
-				
 class PlainTxtDatastore(object):
 	"""
 	This object is stored on disk as a plain text JSON file.
@@ -194,7 +180,7 @@ class PlainTxtDatastore(object):
 		Keep one file per month for 12 months.
 		Keep one file per year forever.
 		"""
-
+		pass
 
 class Market(PlainTxtDatastore):
 	"""
@@ -223,9 +209,9 @@ class Market(PlainTxtDatastore):
 		else:
 			self.load()
 	
-	def trade(self, value, unit, time=None):
+	def trade(self, value, unit, when=None):
 		""" 
-		Convert value \a from_units \a to_units at \a time.
+		Convert value \a from_units \a to_units at \a when.
 		The default time is today
 		"""
 		# figure out which way we are trading
@@ -237,18 +223,18 @@ class Market(PlainTxtDatastore):
 			raise Exception("This Market (%s, %s) can't trade %s"%(self.unitA, self.unitB, unit))
 		
 		# Search for the correct trade value
-		return value * (self.get_ratio(time) ** ratio_exp)
+		return value * (self.get_ratio(when) ** ratio_exp)
 
-	def get_ratio(self, time=None):
+	def get_ratio(self, when=None):
 		"""
 		Get a converstion ratio (unitA/unitB) at \a time.  The default time is today.
 		"""
 		if len(self.points) == 0:
 			raise Exception("This market has no assesment data.")
-		if not time:
-			time = today()
+		if not when:
+			when = datetime.utcnow()
 		i = 0
-		while i < len(self.points) and time > self.points[i][0]:
+		while i < len(self.points) and when > self.points[i][0]:
 			i += 1
 		if i == len(self.points): # Asking about the future.  Use the latest known value
 			return self.points[-1][1] / self.points[-1][2]
@@ -257,7 +243,7 @@ class Market(PlainTxtDatastore):
 		# Linearly interpolate between the two points
 		dA = self.points[i][1] - self.points[i-1][1]
 		dB = self.points[i][2] - self.points[i-1][2]
-		frac = (time - self.points[i-1][0]).days() / (self.points[i][0] - self.points[i-1][0]).days()
+		frac = (when - self.points[i-1][0]).total_seconds() / (self.points[i][0] - self.points[i-1][0]).total_seconds()
 		return (self.points[i-1][1] + frac*dA) / (self.points[i-1][2] + frac*dB)
 		
 	def assess(self, values, when=None):

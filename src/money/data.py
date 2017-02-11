@@ -64,10 +64,139 @@
         on the two tradeables.
 """
 
-from datetime import date
+from datetime import datetime
+import os
+import os.path
+import json
+import time
+
+class DateJSON(json.JSONEncoder, json.JSONDecoder):
+	def default(self, obj):
+		if isinstance(obj, datetime) or isinstance(obj, date):
+			return obj.strftime("%Y-%m-%d %H:%M:%Sz")
+		return json.JSONEncoder.default(self, obj)
+
+#~ class DateJSONDecode(json.JSONDecoder):
+	
+	#~ def decode(self, s):
+		#~ print("DECODE:"+s)
+		#~ if len(s) > 20:
+			#~ return json.JSONDecoder.decode(self, s) 
+		#~ try:
+			#~ return datetime.strptime(s, DateJSON.DATETIME_FMT)
+		#~ except ValueError:
+			#~ try:
+				#~ return datetime.strptime(s, DateJSON.DATE_FMT).date()
+			#~ except ValueError:
+				#~ return json.JSONDecoder.decode(self, s)
+				
+class PlainTxtDatastore(object):
+	"""
+	This object is stored on disk as a plain text JSON file.
+	Each save of the object creates a new file in the object's directory.
+	Old file contents are never overwritten.
+	When the object is loaded, the newest version of the file is loaded.
+	"""
+	
+	DB_FMT = "%Y-%m-%d__%H.%M.%S.json"
+	
+	def __init__(self, path, save_props):
+		"""
+		\a db_props is a list of properties of this object to save.
+		\a path sould be a directory.  If the directory does not exist then it is created.
+		The datafiles for this object are put in the directory.
+		"""
+		if not os.path.isdir(path):
+			if os.path.exists(path):
+				raise Exception("Datastore must point to a directory, not '%'"%path)
+			os.makedirs(path)
+		self._db_path = path
+		self._db_props = save_props
+		
+	def load(self, when=None):
+		"""
+		Loads the local dict properties from disk.  It loads the most recent data <= time.  
+		If time is None then the most recent data is loaded.
+		"""
+		files = self.db_files()
+		if not files:
+			raise Exception("No database files at: %s"%self._db_path)
+		i = 0
+		while when and i < len(files) and when > files[i]:
+			i+=1
+		if i == len(files):
+			raise Exception("No database files before %s"%when.isoformat())
+		name = os.path.join(self._db_path, files[i].strftime(PlainTxtDatastore.DB_FMT))
+		print("LOADING %s"%name)
+		f = open(name, encoding="utf-8")
+		
+		def str_to_date(s):
+			if not s.endswith('z'):
+				return None
+			try:
+				return datetime.strptime(s, "%Y-%m-%d %H:%M:%Sz")
+			except ValueError:
+				return None
+				
+		def convert_dict(obj):
+			print(obj)
+			for k,v in obj.items():
+				if isinstance(v, dict):
+					convert_dict(v)
+				elif isinstance(v, list):
+					convert_list(v)
+				elif isinstance(v, str):
+					d = str_to_date(v)
+					if d:
+						dict[k] = d
+						
+		def convert_list(obj):
+			for i in range(0, len(obj)):
+				if isinstance(obj[i], dict):
+					convert_dict(obj[i])
+				elif isinstance(obj[i], list):
+					convert_list(obj[i])
+				elif isinstance(obj[i], str):
+					d = str_to_date(obj[i])
+					if d:
+						obj[i] = d
+		
+		dat = json.load(f)
+		convert_dict(dat)
+		for k,v in dat.items():
+			setattr(self, k, v)
+		
+		f.close()
+		
+	def save(self):
+		"""
+		Saves all the properties of this object to disk.  Each property object should be JSON serializable.
+		Properties you don't want saved to disk should be prefixed with at least one underscore _dontsave.
+		This does not overwrite any other data files.
+		"""
+		name = os.path.join(self._db_path, datetime.utcnow().strftime(PlainTxtDatastore.DB_FMT))
+		if os.path.exists(name):
+			print("%s exitsts! Sleeping..."%name)
+			time.sleep(2)
+			self.save()
+			return
+		f = open(name, "w", encoding="utf-8")
+		json.dump({k:v for k,v in self.__dict__.items() if k in self._db_props}, f, indent=4, cls=DateJSON, sort_keys=True)
+		f.close()
+	
+	def db_files(self):
+		return sorted(map(lambda s: datetime.strptime(s, PlainTxtDatastore.DB_FMT), os.listdir(self._db_path)), reverse=True)
+	
+	def clean(self):
+		"""
+		Keep every file newer than 10 days old.
+		Keep one file per day for 30 days.
+		Keep one file per month for 12 months.
+		Keep one file per year forever.
+		"""
 
 
-class Market(object):
+class Market(PlainTxtDatastore):
 	"""
 	Repositories only have value relative to other repositories.  
 	So you go to the market to get the value of a repo.
@@ -80,20 +209,20 @@ class Market(object):
 	If you define market values for future dates then you can speculate
 	about the future.  Values are interperated linearly between dates.
 	"""
-	def __init__(self, unitA, unitB):
-		self.unitA = unitA
-		self.unitB = unitB
-		self.points = [] # an array of tuples:  (time, amt_unitA, amt_unitB).  Sorted by time (earliest first).
-		
-	def load(self, url):
-		""" 
-		Load market data from filename  file://asdfasdfasdf
-			or Load data from a url http:// basdfasdfa
-			
-			This method will be overridden in sub classes to implement different data locations
+	def __init__(self, unitA=None, unitB=None, path=None):
 		"""
-		pass
-
+		Pass the path="path/to/market" keyword
+		If createing a new Market, pass unitA and unitB
+		"""
+		super().__init__(path=path, save_props=['unitA', 'unitB', 'points'])
+		
+		if unitA or unitB: # Create a new market
+			self.unitA = unitA
+			self.unitB = unitB
+			self.points = [] # Array of [time, amt_unitA, amt_unitB]
+		else:
+			self.load()
+	
 	def trade(self, value, unit, time=None):
 		""" 
 		Convert value \a from_units \a to_units at \a time.
@@ -131,22 +260,20 @@ class Market(object):
 		frac = (time - self.points[i-1][0]).days() / (self.points[i][0] - self.points[i-1][0]).days()
 		return (self.points[i-1][1] + frac*dA) / (self.points[i-1][2] + frac*dB)
 		
-	def assess(self, amt_unitA, amt_unitB, time=None):
+	def assess(self, values, when=None):
 		""" 
-		Assess \a amt_unitA as \a amt_unitB.  Time defaults to today.
-		
-		market = Market("PrevostBus", "USD")
-		market.assess(1, 5000000) # 1 Bus == $50,000.00
+		\a values is a dictionary {"Bus":1, "USD":5000000}
+		\a when defaults to today.
 		"""
-		if not time:
-			time = date.today()
+		if not when:
+			when = datetime.utcnow()
 		# insert in sorted order
 		i = len(self.points)  # search backward to give O(n) for sorted data
-		while i > 0 and time < self.points[i-1][0]:
+		while i > 0 and when < self.points[i-1][0]:
 			i -= 1
-		if i and self.points[i-1][0] == time:
-			raise Exception("Cannot have two different assessments on the same day")
-		self.points.insert(i, (time, amt_unitA, amt_unitB))
+		if i and self.points[i-1][0] == when:
+			raise Exception("Cannot have two different assessments at the same time")
+		self.points.insert(i, (when, values[self.unitA], values[self.unitB]))
 
 
 class Repo(object):

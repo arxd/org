@@ -69,120 +69,43 @@ import os
 import os.path
 import json
 import time
+from plain_txt_db import DBObject
 
-class DateJSON(json.JSONEncoder, json.JSONDecoder):
-	def default(self, obj):
-		if isinstance(obj, datetime) or isinstance(obj, date):
-			return obj.strftime("%Y-%m-%d %H:%M:%Sz")
-		return json.JSONEncoder.default(self, obj)
-
-class PlainTxtDatastore(object):
+@DBObject.register('long', 'short', 'symbol', 'type', 'frac_digits')
+class ValueUnits(DBObject):
 	"""
-	This object is stored on disk as a plain text JSON file.
-	Each save of the object creates a new file in the object's directory.
-	Old file contents are never overwritten.
-	When the object is loaded, the newest version of the file is loaded.
-	"""
+	A ValueUnits is something that has value.
+	  * US Dollars
+	  * Bananas
+	  * Texas land
+	  * Tokyo land
+	  * Bitcoin
+	  * Bus
+	  * Apple Stock
 	
-	DB_FMT = "%Y-%m-%d__%H.%M.%S.json"
+	It should be quantifiable.  However, it does not hold the quantity information.
+	It is the units; the yen in (100 JPY).  ValueUnits should exchange with themselves at 1:1 value.
+	So land in Texas is not the same as land in Tokyo
+	"""	
+	def new(self, long, short, symbol, type, frac_digits):
+		self.long = long
+		self.short = short
+		self.symbol = symbol
+		self.type = type
+		self.frac_digits = frac_digits
+		return self
+		
+	def to_float(self, quantity):
+		return quantity * (10**-self.frac_digits)
 	
-	def __init__(self, path, save_props):
-		"""
-		\a db_props is a list of properties of this object to save.
-		\a path sould be a directory.  If the directory does not exist then it is created.
-		The datafiles for this object are put in the directory.
-		"""
-		if not os.path.isdir(path):
-			if os.path.exists(path):
-				raise Exception("Datastore must point to a directory, not '%'"%path)
-			os.makedirs(path)
-		self._db_path = path
-		self._db_props = save_props
+	def __str__(self):
+		return self.short
 		
-	def load(self, when=None):
-		"""
-		Loads the local dict properties from disk.  It loads the most recent data <= time.  
-		If time is None then the most recent data is loaded.
-		"""
-		files = self.db_files()
-		if not files:
-			raise Exception("No database files at: %s"%self._db_path)
-		i = 0
-		while when and i < len(files) and when > files[i]:
-			i+=1
-		if i == len(files):
-			raise Exception("No database files before %s"%when.isoformat())
-		name = os.path.join(self._db_path, files[i].strftime(PlainTxtDatastore.DB_FMT))
-		print("LOADING %s"%name)
-		f = open(name, encoding="utf-8")
-		
-		def str_to_date(s):
-			if not s.endswith('z'):
-				return None
-			try:
-				return datetime.strptime(s, "%Y-%m-%d %H:%M:%Sz")
-			except ValueError:
-				return None
-				
-		def convert_dict(obj):
-			print(obj)
-			for k,v in obj.items():
-				if isinstance(v, dict):
-					convert_dict(v)
-				elif isinstance(v, list):
-					convert_list(v)
-				elif isinstance(v, str):
-					d = str_to_date(v)
-					if d:
-						dict[k] = d
-						
-		def convert_list(obj):
-			for i in range(0, len(obj)):
-				if isinstance(obj[i], dict):
-					convert_dict(obj[i])
-				elif isinstance(obj[i], list):
-					convert_list(obj[i])
-				elif isinstance(obj[i], str):
-					d = str_to_date(obj[i])
-					if d:
-						obj[i] = d
-		
-		dat = json.load(f)
-		convert_dict(dat)
-		for k,v in dat.items():
-			setattr(self, k, v)
-		
-		f.close()
-		
-	def save(self):
-		"""
-		Saves all the properties of this object to disk.  Each property object should be JSON serializable.
-		Properties you don't want saved to disk should be prefixed with at least one underscore _dontsave.
-		This does not overwrite any other data files.
-		"""
-		name = os.path.join(self._db_path, datetime.utcnow().strftime(PlainTxtDatastore.DB_FMT))
-		if os.path.exists(name):
-			print("%s exitsts! Sleeping..."%name)
-			time.sleep(2)
-			self.save()
-			return
-		f = open(name, "w", encoding="utf-8")
-		json.dump({k:v for k,v in self.__dict__.items() if k in self._db_props}, f, indent=4, cls=DateJSON, sort_keys=True)
-		f.close()
-	
-	def db_files(self):
-		return sorted(map(lambda s: datetime.strptime(s, PlainTxtDatastore.DB_FMT), os.listdir(self._db_path)), reverse=True)
-	
-	def clean(self):
-		"""
-		Keep every file newer than 10 days old.
-		Keep one file per day for 30 days.
-		Keep one file per month for 12 months.
-		Keep one file per year forever.
-		"""
-		pass
+	def __eq__(self, other):
+		return self.short == str(other)
 
-class Market(PlainTxtDatastore):
+@DBObject.register('unitA', 'unitB', 'points')
+class Market(DBObject):
 	"""
 	Repositories only have value relative to other repositories.  
 	So you go to the market to get the value of a repo.
@@ -195,29 +118,21 @@ class Market(PlainTxtDatastore):
 	If you define market values for future dates then you can speculate
 	about the future.  Values are interperated linearly between dates.
 	"""
-	def __init__(self, unitA=None, unitB=None, path=None):
-		"""
-		Pass the path="path/to/market" keyword
-		If createing a new Market, pass unitA and unitB
-		"""
-		super().__init__(path=path, save_props=['unitA', 'unitB', 'points'])
+	def new(self, unitA, unitB):
+		self.unitA = unitA
+		self.unitB = unitB
+		self.points = []
+		return self
 		
-		if unitA or unitB: # Create a new market
-			self.unitA = unitA
-			self.unitB = unitB
-			self.points = [] # Array of [time, amt_unitA, amt_unitB]
-		else:
-			self.load()
-	
 	def trade(self, value, unit, when=None):
 		""" 
 		Convert value \a from_units \a to_units at \a when.
 		The default time is today
 		"""
 		# figure out which way we are trading
-		if unit == self.unitA:
+		if self.unitA == unit:
 			ratio_exp = -1.0 # value_A *  (B/A)
-		elif unit == self.unitB:
+		elif self.unitB == unit:
 			ratio_exp = 1.0 # value_B * (A/B)
 		else:
 			raise Exception("This Market (%s, %s) can't trade %s"%(self.unitA, self.unitB, unit))
@@ -259,10 +174,10 @@ class Market(PlainTxtDatastore):
 			i -= 1
 		if i and self.points[i-1][0] == when:
 			raise Exception("Cannot have two different assessments at the same time")
-		self.points.insert(i, (when, values[self.unitA], values[self.unitB]))
+		self.points.insert(i, (when, values[str(self.unitA)], values[str(self.unitB)]))
 
-
-class Repo(object):
+@DBObject.register('name', 'quantity', 'owner')
+class Repo(DBObject):
 	""" 
 	A Repo (Repository) is a place where 'value' is kept.  It has an integer quantity of 'stuff'.  
 	It is kept as an integer to avoid flotaing point imprecision and ensure exact math.
@@ -272,7 +187,8 @@ class Repo(object):
 	A credit card account would be represented by a Repo that is not owned by you (someone elses money)
 	A company (Walmart) would also be a Repo not owned by you.
 	"""
-	def __init__(self, name, frac_digits=2, units="USD", mine=False):
+	def new(self, path, name, frac_digits=2, units="USD", mine=False):
+		#~ super().__init__(path=path, save_props=['unitA', 'unitB', 'points'])
 		self.name = name  # Bus, Scooter, Capital One Checking, Cash, etc.
 		self.frac_digits = frac_digits # Since quantity is an integer, this tells us how many of those digits are fractional parts.  USD:2, JPY:0,  etc.
 		self.quantity = 0 # This is an integer value of quantity, 1 bus, 200 cents,  3000000 cm^2 of land, etc.
@@ -286,9 +202,9 @@ class Repo(object):
 		if not market:
 			return self.quantity
 		# use the market
-		return market.trade(self.quantity, self.units, when)
 
 
+@DBObject.register_inline
 class Transfer(object):
 	""" We keep track of value moving between Repositories.
 	
@@ -312,3 +228,4 @@ class Transfer(object):
 		self.memo = memo
 		self.tags = tags
 		self.when = None
+

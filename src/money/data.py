@@ -67,12 +67,11 @@
 from datetime import datetime
 import os
 import os.path
-import json
+import yaml
 import time
-from plain_txt_db import DBObject
+from plain_txt_db import DB
 
-@DBObject.register('long', 'short', 'symbol', 'type', 'frac_digits')
-class ValueUnits(DBObject):
+class ValueUnit(yaml.YAMLObject):
 	"""
 	A ValueUnits is something that has value.
 	  * US Dollars
@@ -87,16 +86,20 @@ class ValueUnits(DBObject):
 	It is the units; the yen in (100 JPY).  ValueUnits should exchange with themselves at 1:1 value.
 	So land in Texas is not the same as land in Tokyo
 	"""	
-	def new(self, long, short, symbol, type, frac_digits):
+	yaml.tag="!ValueUnit"
+	def __init__(self, long, short, symbol, type, frac_digits):
 		self.long = long
 		self.short = short
 		self.symbol = symbol
 		self.type = type
 		self.frac_digits = frac_digits
-		return self
-		
+	
+	def __repr__(self):
+		return "%s(long=%r, short=%r, symbol=%r, type=%r, frac_digits)" % (
+			self.__class__.__name__, self.short, self.symbol, self.type, self.frac_digits)
+
 	def to_float(self, quantity):
-		return quantity * (10**-self.frac_digits)
+		return quantity * (10**-self.frac_digits)		
 	
 	def __str__(self):
 		return self.short
@@ -104,8 +107,8 @@ class ValueUnits(DBObject):
 	def __eq__(self, other):
 		return self.short == str(other)
 
-@DBObject.register('unitA', 'unitB', 'points')
-class Market(DBObject):
+
+class Market(yaml.YAMLObject):
 	"""
 	Repositories only have value relative to other repositories.  
 	So you go to the market to get the value of a repo.
@@ -118,11 +121,16 @@ class Market(DBObject):
 	If you define market values for future dates then you can speculate
 	about the future.  Values are interperated linearly between dates.
 	"""
-	def new(self, unitA, unitB):
+	yaml_tag="!Market"
+	
+	def __init__(self, unitA, unitB, points):
 		self.unitA = unitA
 		self.unitB = unitB
-		self.points = []
-		return self
+		self.points = [] #array of tuples (datetime, amt of unitA, amnt of unitB)
+		
+	def __repr__(self):
+		return "%s(unitA=%r, unitB=%r, points=%r)" % (
+			self.__class__.__name__, self.unitA, self.unitB, self.points)
 		
 	def trade(self, value, unit, when=None):
 		""" 
@@ -176,8 +184,8 @@ class Market(DBObject):
 			raise Exception("Cannot have two different assessments at the same time")
 		self.points.insert(i, (when, values[str(self.unitA)], values[str(self.unitB)]))
 
-@DBObject.register('name', 'quantity', 'owner')
-class Repo(DBObject):
+
+class Repo(object):
 	""" 
 	A Repo (Repository) is a place where 'value' is kept.  It has an integer quantity of 'stuff'.  
 	It is kept as an integer to avoid flotaing point imprecision and ensure exact math.
@@ -203,9 +211,7 @@ class Repo(DBObject):
 			return self.quantity
 		# use the market
 
-
-@DBObject.register_inline
-class Transfer(object):
+class Transfer(yaml.YAMLObject):
 	""" We keep track of value moving between Repositories.
 	
 	A purchase at a store would be multiple transfers.  
@@ -222,6 +228,9 @@ class Transfer(object):
 		Transfer("Capital One Checking", "Coinbase")
 		Transfer("Coinbase", "Bitcoin wallet")
 	"""
+	
+	yaml_tag = "!Transfer"
+	
 	def __init__(self, from_repo, to_repo, memo="", tags={}):
 		self.from_repo = from_repo
 		self.to_repo = to_repo
@@ -229,3 +238,21 @@ class Transfer(object):
 		self.tags = tags
 		self.when = None
 
+	def __repr__(self):
+		return "%s("
+
+class FinanceSystem(yaml.YAMLObject):
+	"""
+	This holds all the data needed to track your finances
+	"""
+	yaml_tag = "!FinanceSystem"
+	
+	def __init__(self, units, markets, repos, transactions):
+		self.units = units
+		self.markets = markets
+		self.repos = repos
+		self.transactions = transactions
+		
+	def __repr__(self):
+		return "%s(units=%r, markets=%r, repos=%r, transactions)" % (
+			self.__class__.__name__, self.units, self.markets, self.repos, self.transactions)

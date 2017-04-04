@@ -1,4 +1,4 @@
-from plain_txt_db import YAMLSetter
+from PlainTxtDB import YAMLSetter
 
 class Ingredient(YAMLSetter):
 	""" An ingredient is a certain amount of food, prepared in a certain way.

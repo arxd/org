@@ -68,7 +68,7 @@ from datetime import datetime
 import os
 import os.path
 import time
-from plain_txt_db import DB, YAMLSetter
+from PlainTxtDB import DB, YAMLSetter
 
 class ValueUnit(yaml.YAMLObject, YAMLSetter):
 	"""

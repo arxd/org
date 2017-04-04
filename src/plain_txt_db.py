@@ -12,7 +12,7 @@ from datetime import datetime
 import os.path
 import os
 
-class YAMLSetter(object):
+class YAMLSetter(yaml.YAMLObject):
 	def __init__(self, kwargs):
 		for k,v in self.__class__.yaml_props.items():
 			self.__dict__[k] = kwargs[k] if k in kwargs else v

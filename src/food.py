@@ -1,6 +1,6 @@
-from plain_txt_db import DB, YAMLSetter
+from plain_txt_db import YAMLSetter
 
-class Ingredient(yaml.YAMLObject, YAMLSetter):
+class Ingredient(YAMLSetter):
 	""" An ingredient is a certain amount of food, prepared in a certain way.
 	Internally the amount is kept in grams to make things easier.  (does it make things easier?)
 		\param food is of class Food
@@ -24,6 +24,9 @@ class Ingredient(yaml.YAMLObject, YAMLSetter):
 		return Ingredient(food=self.food, amount=self.amount*other, prep=self.prep)
 
 	def guess_unit(self):
+		""" Try to guess the best unit to represent this amount in.  There are hints if unit_volume or unit_mass
+		is set to 1.0.
+		"""
 		if self.food.unit_volume == 1.0: # a volume unit would be best
 			guess_units = [x[0] for x in Ingredient.volume_units]
 		elif self.food.unit_mass == 1.0: # a mass unit would be best
@@ -31,24 +34,30 @@ class Ingredient(yaml.YAMLObject, YAMLSetter):
 		else: # try volume or unit_label fall back on mass
 			guess_units = [self.food.unit_label] + [x[0] for x in Ingredient.volume_units] 
 		
-		# choose the first unit that has whole unit error
+		# The units are listed in the order of priority so the first one you find wins
 		for v,u in  [self.amt(t) for t in guess_units]:
-			#print("%s : %s  %s"%(u, v, (v/0.25 + 0.02)%1.0))
+			# Are we close to 1/2 1/3 1/4 etc. of a unit?
 			if (v/0.25 + 0.02)%1.0 < 0.04 or (v/ (1.0/3.0) + 0.02)%1.0 < 0.04:
 				return u
 		return u
 		
 
 	def amt(self, unit=None):
-		""" Return a tuple (amt, 'unit') of the amount of this ingredient.  If you leave unit=None then it tries to guess the best unit."""
+		""" Return a tuple (amt, 'unit') of the amount of this ingredient.  
+		If you leave unit=None then it tries to guess the best unit.
+		"""
 		if unit == None:
 			unit = self.guess_unit()
+			
+		# Is the unit a custom food unit (1 egg, 1 stick of butter, 1 carrot)
 		if unit == self.food.unit_label:
 			return (self.amount / self.food.unit_mass, unit)
+			
 		# Check volume units
 		for u,v in Ingredient.volume_units:
 			if u == unit:
 				return (self.amount * self.food.unit_volume / self.food.unit_mass / v, unit)
+				
 		# Maybe it is a mass unit
 		for u,v in Ingredient.mass_units:
 			if u == unit:
@@ -58,6 +67,8 @@ class Ingredient(yaml.YAMLObject, YAMLSetter):
 		raise Exception("%s is not a valid unit"%unit)
 	
 	def str_amt(self, unit=None):
+		""" Convert the floating point amount 1.3333 to a nice 1-1/3
+		"""
 		amt, unit = self.amt(unit)
 		whole, part = divmod(amt, 1)
 		if part > 0.875:
@@ -84,12 +95,12 @@ class Ingredient(yaml.YAMLObject, YAMLSetter):
 		
 
 
-class Recipe(yaml.YAMLObject, YAMLSetter):
+class Recipe(YAMLSetter):
 	"""  A Recipe describes how to combine Foods to create a new Food.  """
 	yaml_tag="!Recipe"
 	yaml_props = {
 		'ingredients': [],
-		'instructions': []
+		'instructions': [],
 	}
 	
 	def __init__(self, **kwargs):
@@ -103,17 +114,22 @@ class Recipe(yaml.YAMLObject, YAMLSetter):
 		astr += '\n'.join(map(lambda s: '\t'+str(s), self.ingredients))
 		astr += "\n == Instructions ==\n"
 		astr += '\n'.join(map(lambda s: ' * '+s, self.instructions))
+		
 		return astr
 
 
-class Food(yaml.YAMLObject, YAMLSetter):
+class Food(YAMLSetter):
 	""" A food can be an elementary food (oranges, papurika, water), or a composite recipie (spaghetti sauce, cocoa).
 	
-	All foods are measured by mass in grams.  Some foods might prefer to be counted (2 carrots, 3 eggs).  In this case you can supply \a unit_mass, which indicates the average mass (in grams) of one 'unit' of this food.  Similarly, \a unit_volume allows us to calculate density and convert this unit however we need to.
+	All foods are measured by mass in grams.  Some foods might prefer to be counted (2 carrots, 3 eggs).  In this 
+	case you can supply \a unit_mass, which indicates the average mass (in grams) of one 'unit' of this food.  
+	Similarly, \a unit_volume allows us to calculate density and convert this unit however we need to.
 	
-	\param unit_volume : volume in milliliters of one 'unit' of this food.  Should be 1.0 if this is non-countable and usually measured by volume (e.g. Flour). 
+	\param unit_volume : volume in milliliters of one 'unit' of this food.  Should be 1.0 if this is non-countable 
+	and usually measured by volume (e.g. Flour). 
 	
-	\param unit_mass : mass in grams of one 'unit' of this food.  Should be 1.0 if this is non-countable and usually measured by mass (e.g. Meat).
+	\param unit_mass : mass in grams of one 'unit' of this food.  Should be 1.0 if this is non-countable and 
+	usually measured by mass (e.g. Meat).
 	
 	\param tags : Tags is an optional set of categories to put this object into.  (e.g. 'dessert', 'sauce', 'christmas')
 	

@@ -149,6 +149,8 @@ class Food(YAMLSetter):
 		'tags': [],
 		'description': '',
 		'recipe': None,
+		'ingredients': [],
+		'instructions': [],
 	}
 	
 	def __init__(self, **kwargs):
@@ -156,8 +158,13 @@ class Food(YAMLSetter):
 	
 	def verbose(self):
 		astr = "%s %s\n"%(self.name, ' : '+self.description if self.description else '')
-		if self.recipe:
-			astr += str(self.recipe) + '\n'
+		if self.ingredients:
+			astr += " == Ingredients ==\n"
+			astr += '\n'.join(map(lambda s: '\t'+str(s), self.ingredients))
+		if self.instructions:
+			astr += "\n == Instructions ==\n"
+			astr += '\n'.join(map(lambda s: ' * '+s, self.instructions))
+	
 		return astr
 		
 	def __str__(self):

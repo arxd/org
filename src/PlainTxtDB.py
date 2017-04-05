@@ -38,7 +38,7 @@ class DB(object):
 		print("Loading %s"%name)
 		with open(name, encoding="utf-8") as f:
 			obj = yaml.load(f)
-		return obj
+		return (obj, name)
 		
 	@classmethod
 	def save(self, obj,  path):
@@ -53,13 +53,15 @@ class DB(object):
 			f.flush()
 			os.fsync(f.fileno())
 		# Write the real data
-		with open(os.path.join(path, name), 'w', encoding='utf-8') as f:
+		filename = os.path.join(path, name)
+		with open(filename, 'w', encoding='utf-8') as f:
 			yaml.dump(obj, f, width=80, indent=4)
 			f.flush()
 			os.fsync(f.fileno())
 		# Delete the 'saving' file
 		os.remove(os.path.join(path, 'saving'))
 		print("Save Successful")
+		return filename
 		
 		
 	@classmethod

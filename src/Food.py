@@ -94,30 +94,6 @@ class Ingredient(YAMLSetter):
 		return "%s\t: %s"%(self.food.name, self.str_amt())
 		
 
-
-class Recipe(YAMLSetter):
-	"""  A Recipe describes how to combine Foods to create a new Food.  """
-	yaml_tag="!Recipe"
-	yaml_props = {
-		'ingredients': [],
-		'instructions': [],
-	}
-	
-	def __init__(self, **kwargs):
-		YAMLSetter.__init__(self, kwargs)
-	
-	def __mul__(self, other):
-		return Recipe(ingredients = [i*other for i in self.ingredients], instructions = self.instructions)
-		
-	def __str__(self):
-		astr = " == Ingredients ==\n"
-		astr += '\n'.join(map(lambda s: '\t'+str(s), self.ingredients))
-		astr += "\n == Instructions ==\n"
-		astr += '\n'.join(map(lambda s: ' * '+s, self.instructions))
-		
-		return astr
-
-
 class Food(YAMLSetter):
 	""" A food can be an elementary food (oranges, papurika, water), or a composite recipie (spaghetti sauce, cocoa).
 	

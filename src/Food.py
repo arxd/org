@@ -1,3 +1,9 @@
+"""
+There are two classes:  Food and Ingredient.
+A Food can be a recipe (Cookies) or a basic food (Apple, Cinnamon).
+An Ingedient is an amount of food (in grams).  
+"""
+
 from PlainTxtDB import YAMLSetter
 
 class Ingredient(YAMLSetter):
@@ -20,8 +26,15 @@ class Ingredient(YAMLSetter):
 	def __init__(self, **kwargs):
 		YAMLSetter.__init__(self, kwargs)
 
-	def __mul__(self, other):
-		return Ingredient(food=self.food, amount=self.amount*other, prep=self.prep)
+	def __mul__(self, factor):
+		return Ingredient(food=self.food, amount=self.amount*factor, prep=self.prep)
+
+	def __imul__(self, factor):
+		self.amount *= factor
+		return self
+
+	def __eq__(self, other):
+		return self.food.name == str(other)
 
 	def guess_unit(self):
 		""" Try to guess the best unit to represent this amount in.  There are hints if unit_volume or unit_mass
@@ -91,7 +104,7 @@ class Ingredient(YAMLSetter):
 		return "%s%s%s %s"%(whole, '-' if whole and part else '', part, unit)
 	
 	def __str__(self):
-		return "%s\t: %s"%(self.food.name, self.str_amt())
+		return self.food.name
 		
 
 class Food(YAMLSetter):
@@ -116,15 +129,14 @@ class Food(YAMLSetter):
 	yaml_tag="!Food"
 	yaml_props = {
 		'name':'',
-		'unit_mass': 1.000000001,
-		'unit_volume': 1.0,
+		'unit_mass': 1.0,
+		'unit_volume': 1.00000001,
 		'unit_label': '',
 		'kcals': -1,
 		'protein': -1,
 		'carbs': -1,
 		'tags': [],
 		'description': '',
-		'recipe': None,
 		'ingredients': [],
 		'instructions': [],
 	}
@@ -132,14 +144,28 @@ class Food(YAMLSetter):
 	def __init__(self, **kwargs):
 		YAMLSetter.__init__(self, kwargs)
 	
+	def __eq__(self, other):
+		return self.name == str(other)
+	
+	def scale(self, factor):
+		""" Scale this recipe by the given factor """
+		for i in self.ingredients:
+			i *= factor
+		return self
+	
+	def is_recipe(self):
+		return len(self.ingredients) > 0
+	
 	def verbose(self):
-		astr = "%s %s\n"%(self.name, ' : '+self.description if self.description else '')
+		title = "%s %s\n"%(self.name, ' : '+self.description if self.description else '')
+		astr = '='*len(title) + '\n%s'%title + '-'*len(title)
 		if self.ingredients:
-			astr += " == Ingredients ==\n"
-			astr += '\n'.join(map(lambda s: '\t'+str(s), self.ingredients))
+			astr += "\nIngredients:\n"
+			max_name = max(map(lambda x: len(str(x)), self.ingredients))
+			astr += '\n'.join(map(lambda s: '   %s%s | %s'%(' '*(max_name-len(str(s))), s, s.str_amt()), self.ingredients))
 		if self.instructions:
-			astr += "\n == Instructions ==\n"
-			astr += '\n'.join(map(lambda s: ' * '+s, self.instructions))
+			astr += "\n\nInstructions:\n"
+			astr += '\n'.join(map(lambda s: '  * '+s, self.instructions))
 	
 		return astr
 		

@@ -13,27 +13,24 @@ class LabelEdit(object):
 		
 		self.entry = tk.Entry(parent)
 		self.entry['textvariable'] = self.val
-		self.entry['validate'] = 'focusout'
-		self.entry['validatecommand'] = (parent.register(getattr(self, 'on_change')), '%s')
+		self.entry['validatecommand'] = (parent.register(getattr(self, 'on_change')), '%P')
 		self.entry.grid(row=row, column=col+1, columnspan=colspan, sticky=tk.W+tk.E)
 		
 	def set(self, food):
+		assert(food)
 		self.food = food
-		self.entry['validate'] = 'none'
-		if self.food:
-			self.update()
-		else:
-			self.val.set("")
-		self.entry['validate'] = 'focusout'
+		self.entry['validate'] = 'none' # So that setting the value doesn't trigger on_change
+		self.update() # different sub-classses can override this
+		self.entry['validate'] = 'all'
 	
 	def update(self):
-		self.entry['fg'] = 'black'
 		self.val.set(str(getattr(self.food, self.name)))
 		
 	def on_change(self, value):
 		setattr(self.food, self.name, value)
 		return True
-		
+
+
 class TagsEdit(LabelEdit):
 	def update(self):
 		self.val.set(",".join(getattr(self.food, self.name)))
@@ -55,17 +52,18 @@ class FloatEdit(LabelEdit):
 				value = -1.0
 			f = float(value)
 			setattr(self.food, self.name, f)
-			self.entry['fg'] = 'black'
 			return True
 		except:
-			self.entry['fg'] = 'red'
 			return False
 
 
 class FoodView(tk.LabelFrame):
+	""" The right-hand side of the window
+	"""
 	def __init__(self, parent, foodlist, **kwargs):
 		tk.LabelFrame.__init__(self, parent, text="Food", **kwargs)
 		self.foodlist = foodlist
+		self.food = None
 		self.rowconfigure(5, weight=1)
 		self.columnconfigure(1, weight=1)
 		self.columnconfigure(3, weight=1)
@@ -87,10 +85,12 @@ class FoodView(tk.LabelFrame):
 		bottom.add(ingredients)
 		
 		instructions = tk.LabelFrame(self, text="Instructions")
+		self.instr = tk.Text(instructions).grid(row=0, column=0, sticky=tk.NW+tk.SE)
 		bottom.add(instructions)
 		
+		
 		adding = tk.Button(ingredients, text="Add Ingredient").grid(row=0, column=0)
-		addinst = tk.Button(instructions, text="Add Instruction").grid(row=0, column=0)
+		#~ addinst = tk.Button(instructions, text="Add Instruction").grid(row=0, column=0)
 		
 		self.bind_all('<<ListboxSelect>>', getattr(self,'on_food_change'))
 	
@@ -98,14 +98,16 @@ class FoodView(tk.LabelFrame):
 		try:
 			val = evt.widget.get(int(evt.widget.curselection()[0]))
 		except: # sometimes it decides to deselect and the tuple[0] fails
+			self.foodlist.select(self.food)
 			return
-		food = self.foodlist.get_food(val)
-		self.config(text=food.name)
+		self.food = self.foodlist.get_food(val)
+		self.config(text=self.food.name)
 		for e in self.entries:
-			e.set(food)
+			e.set(self.food)
 	
 	
 class FoodList(tk.Frame):
+	""" The left-hand side of the window """
 	def __init__(self, parent, foods, **kwargs):
 		tk.Frame.__init__(self, parent, **kwargs)
 		self.foods = foods
@@ -114,18 +116,23 @@ class FoodList(tk.Frame):
 		self.columnconfigure(0, weight=1)
 		yScroll = tk.Scrollbar(self, orient=tk.VERTICAL)
 		yScroll.grid(row=0, column=1, sticky=tk.N+tk.S)
-		self.all = tk.Listbox(self, yscrollcommand=yScroll.set)#, selectmode=tk.SINGLE)
-		self.all.grid(row=0, column=0, sticky=tk.N+tk.S+tk.E+tk.W)
+		self.all = tk.Listbox(self, yscrollcommand=yScroll.set)
+		self.all.grid(row=0, column=0, sticky=tk.NE+tk.SW)
 		yScroll['command'] = self.all.yview
 		
 		for f in self.foods:
 			self.all.insert(tk.END, f.name)
 
+	def select(self, afood):
+		idx = self.foods.index(afood)
+		self.all.selection_clear(0, tk.END)
+		self.all.selection_set(idx)
+
 	def get_food(self, foodstr):
-		for f in self.foods:
-			if f.name == foodstr:
-				return f
-		return None
+		try:
+			return self.foods[self.foods.index(foodstr)]
+		except:
+			return None
 
 
 class FoodBrowser(tk.PanedWindow): 
@@ -145,17 +152,21 @@ class FoodBrowser(tk.PanedWindow):
 		
 
 if __name__ == '__main__':
-	db = 'db/food' if len(sys.argv) < 2 else sys.argv[1]
-	app = FoodBrowser(db)
+	# You can pass a database name if you want
+	dbname = 'db/food' if len(sys.argv) < 2 else sys.argv[1]
+	
+	app = FoodBrowser(dbname)
 	app.grid(sticky=tk.NE + tk.SW)
 	top = app.winfo_toplevel()
 	top.rowconfigure(0, weight=1)
 	top.columnconfigure(0, weight=1)
-	menuBar = tk.Menu(top)
-	top['menu'] = menuBar
-	sub_file = tk.Menu(menuBar)
-	menuBar.add_cascade(label='File', menu=sub_file)
-	sub_file.add_command(label='Save', command=getattr(app, 'save'))
-	sub_file.add_command(label='Quit', command=app.quit)
-	app.mainloop()
+	
+	# Top Menu
+	menu = tk.Menu(top)
+	menu.add_command(label='Save', command=getattr(app, 'save'))
+	menu.add_command(label='Quit', command=app.quit)
+	top['menu'] = menu
+	
+	#gogo
+	top.mainloop()
 

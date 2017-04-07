@@ -96,12 +96,13 @@ class Tag(object):
 		return match_r(0)[0]
 
 	@staticmethod
-	def filter(iterable, tagstr):
+	def filter(iterable, tagexpr):
 		""" Return a filtered list of foods based on the tagstr.
 		This is prefered because it only parses the tagstr once.
 		"""
 		try:
-			tagexpr = Tag.parse(tagstr)
+			if isinstance(tagexpr, str):
+				tagexpr = Tag.parse(tagexpr)
 		except Exception as e:
 			print("Syntax Error in tag expression")
 			return []

@@ -84,15 +84,18 @@ class FoodView(tk.LabelFrame):
 		
 		bottom = tk.PanedWindow(self, orient=tk.VERTICAL)
 		bottom.grid(row=5, column=0, columnspan=4, sticky=tk.NW+tk.SE)
-		ingredients = tk.LabelFrame(self, text="Ingredients")
-		bottom.add(ingredients)
+		ingframe = tk.LabelFrame(self, text="Ingredients")
+		self.ingrtxt = tk.Text(ingframe)
+		self.ingrtxt.grid(row=0, column=0, sticky=tk.NW+tk.SE)
+		bottom.add(ingframe)
 		
-		instructions = tk.LabelFrame(self, text="Instructions")
-		self.instr = tk.Text(instructions).grid(row=0, column=0, sticky=tk.NW+tk.SE)
-		bottom.add(instructions)
+		iframe = tk.LabelFrame(self, text="Instructions")
+		self.insttxt = tk.Text(iframe)
+		self.insttxt.grid(row=0, column=0, sticky=tk.NW+tk.SE)
+		bottom.add(iframe)
 		
 		
-		adding = tk.Button(ingredients, text="Add Ingredient").grid(row=0, column=0)
+		#adding = tk.Button(ingredients, text="Add Ingredient").grid(row=0, column=0)
 		#~ addinst = tk.Button(instructions, text="Add Instruction").grid(row=0, column=0)
 		
 		self.bind_all('<<ListboxSelect>>', getattr(self,'on_food_change'))
@@ -107,6 +110,11 @@ class FoodView(tk.LabelFrame):
 		self.config(text=self.food.name)
 		for e in self.entries:
 			e.set(self.food)
+		self.insttxt.delete('0.0', tk.END)
+		self.insttxt.insert(tk.END, '\n'.join(self.food.instructions))
+		self.ingrtxt.delete('0.0', tk.END)
+		self.ingrtxt.insert(tk.END, self.food.ingredients_str())
+		
 	
 	
 class FoodList(tk.Frame):
@@ -144,7 +152,6 @@ class FoodList(tk.Frame):
 		self.all.delete(0, tk.END)
 		for f in Tag.filter(self.foods, self.filter_expr):
 			self.all.insert(tk.END, f.name)
-	
 	
 	def select(self, afood):
 		idx = self.foods.index(afood)

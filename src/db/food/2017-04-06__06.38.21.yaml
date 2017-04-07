@@ -1,0 +1,118 @@
+- &id002 !Food
+    carbs: -1
+    description: eggs are ellipsoids
+    ingredients: []
+    instructions: []
+    kcals: -1
+    name: egg
+    protein: -1
+    recipe: null
+    tags: &id001 []
+    unit_label: ''
+    unit_mass: 52.0
+    unit_volume: 46.0
+- &id004 !Food
+    carbs: -1
+    description: It's Yellow
+    ingredients: []
+    instructions: []
+    kcals: -1
+    name: butter
+    protein: -1
+    recipe: null
+    tags: [FATTY, DELICIOUS]
+    unit_label: stick
+    unit_mass: 113.4
+    unit_volume: 118.294
+- &id003 !Food
+    carbs: 0.0
+    description: ''
+    ingredients: []
+    instructions: []
+    kcals: 0.0
+    name: water
+    protein: 0.0
+    recipe: null
+    tags: []
+    unit_label: ''
+    unit_mass: 1.0
+    unit_volume: 1.0
+- &id006 !Food
+    carbs: -1
+    description: ''
+    ingredients: []
+    instructions: []
+    kcals: -1
+    name: beef
+    protein: -1
+    recipe: null
+    tags: *id001
+    unit_label: ''
+    unit_mass: 1.0
+    unit_volume: 0.9
+- &id005 !Food
+    carbs: -1
+    description: ''
+    ingredients:
+    - !Ingredient
+        amount: 2.0
+        food: *id002
+        prep: ''
+        unit: ''
+    - !Ingredient
+        amount: 124.0
+        food: *id003
+        prep: ''
+        unit: ml
+    - !Ingredient
+        amount: 1.0
+        food: *id004
+        prep: melted
+        unit: tbsp
+    instructions: [Add the egg yokes separately from the whites, Mix for 3 hours]
+    kcals: -1
+    name: Eggy Sauce
+    protein: -1
+    tags: [SAUCE, RECIPE]
+    unit_label: ''
+    unit_mass: 100.0
+    unit_volume: 100.0
+- !Food
+    carbs: -1
+    description: ''
+    ingredients:
+    - !Ingredient
+        amount: 1.0
+        food: *id005
+        prep: ''
+        unit: ''
+    - !Ingredient
+        amount: 16.0
+        food: *id006
+        prep: ''
+        unit: oz
+    - !Ingredient
+        amount: 4.5
+        food: &id007 !Food
+            carbs: -1
+            description: Really spicy stuff
+            ingredients: []
+            instructions: []
+            kcals: -1
+            name: pepper
+            protein: -1
+            tags: []
+            unit_label: ''
+            unit_mass: 1.0
+            unit_volume: 1.00000001
+        prep: Shaken not stirred
+        unit: tbsp
+    instructions: [Drop the sauce on from a height of 5ft.]
+    kcals: -1
+    name: Super Steak
+    protein: -1
+    tags: [ENTREE, RECIPE, DELICIOUS]
+    unit_label: ''
+    unit_mass: 1.0
+    unit_volume: 1.0
+- *id007

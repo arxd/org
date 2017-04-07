@@ -35,7 +35,7 @@ g_food = None
 
 def cmd(func):
 	def do_cmd(args, kvargs):
-		print("%s %s %s"%(func.__name__, args, kvargs))
+		print("\n_____%s %s %s\n"%(func.__name__, args, kvargs))
 		func(*args, **kvargs)
 	# add the command to the global set of commands
 	global g_cmds
@@ -75,32 +75,36 @@ def show(factor=1.0):
 	"""
 	show [FACTOR]
 		Show all the information about the current food.
-		Optionally scale the recipe by FACTOR
+		Optionally scale the recipe by FACTOR (eg 2.0 or 0.5)
 	"""
 	global g_food
 	print(g_food.scale(float(factor)).verbose())
 	
 
 @cmd
-def list(type='all', verbose=False):
+def list(tagexpr='', verbose=False):
 	"""
-	list [TYPE]
-		Type can be:
-		  - 'all' : List all foods
-		  - 'recipe' : List only recipes
-		  - 'basic' : List only non-recipe foods
+	list [TAGEXPR]
+		You can specify a TAGEXPR to filter the results.
+		The tag name 'recipe' filters for foods that have a recipe.
+		
+		Examples:
+		
+		list dessert                         # List only desserts
+		list -dessert			     # List everything EXCEPT
+							desserts
+		list "ice cream, cake"               # ice cream or cake
+		list "dessert & -(cake, ice cream)"  # Dessert but no cake or 
+							ice cream
+		list "dessert & healthy & delicious" # Only healty, delicious
+							desserts
 	"""
 	global g_foods
-	for f in g_foods:
-		if not ( type=='all' or
-			type=='recipe' and f.is_recipe() or 
-			type=='basic' and not f.is_recipe()):
-			continue
-		
+	for f in Tag.filter(g_foods, tagexpr):
 		if verbose:
 			print(f.verbose())
 		else:
-			print(" - %s%s%s"%(f, ' : ' if f.description else '', f.description))
+			print(" - %s%s%s  %s"%(f, ' : ' if f.description else '', f.description, '<' + '> <'.join(f.tags) + '>'))
 
 @cmd
 def new(name, desc=""):
@@ -111,12 +115,11 @@ def new(name, desc=""):
 		Set food NAME as the current working food.
 	"""
 	global g_foods, g_food
-	try:
-		idx = g_foods.index(name)
-		g_food = g_foods[idx]
-	except:
+	if name in g_foods:
+		g_food = g_foods[g_foods.index(name)]
+	else:
 		g_food = Food(name=name, description=desc)
-		g_foods.append(g_curfood)
+		g_foods.append(g_food)
 
 @cmd
 def food(name):
@@ -125,10 +128,9 @@ def food(name):
 		Set food NAME as the current working food.
 	"""
 	global g_foods, g_food
-	try:
-		g_food = g_foods[ g_foods.index(name)]
-	except:
+	if name not in g_foods:
 		raise Exception("'%s' does not exist.  Create it with the 'new' command."%name)
+	g_food = g_foods[ g_foods.index(name)]
 
 
 @cmd
@@ -138,9 +140,15 @@ def delete(name):
 		Delete the food NAME from the database.  You cannot delete 
 		a food that is used as an ingredient.
 	"""
-	pass
-	#~ for f in foods:
-		#~ if f 
+	global g_foods, g_food
+	if max([ing==name for food in g_foods for ing in food.ingredients]):
+		print("'%s' is used as an ingredient.  It cannot be deleted"%name)
+		return
+	if g_food == name:
+		g_food = None
+	if name not in g_foods:
+		print("Couldn't find '%s'"%name)
+	g_foods.remove(name)
 
 @cmd
 def load(dbname='db/food'):
@@ -168,6 +176,41 @@ def save(dbname=None):
 	g_dbname = dbname
 	DB.save(g_foods, g_dbname)
 
+@cmd
+def ingd(food, amount, prep=""):
+	"""
+	ingd FOOD AMOUNT [PREP]
+		Add an ingredient to the current food.
+		The AMOUNT can be a easy string "1 1/2 cup" 
+		PREP is an optional preperation ("sliced", "diced", etc.)
+	"""
+	global g_food, g_foods
+	assert(g_food)
+	if food not in g_foods:
+		raise Exception("'%s' is not a food"%food)
+	g_food.add_ingredient(g_foods[g_foods.index(food)], amount, prep)
+	
+@cmd
+def inst(text):
+	"""
+	inst TEXT
+		Add a new instruction to the recipe.
+	"""
+	global g_food
+	assert(g_food)
+	g_food.instructions.append(text)
+	
+
+@cmd
+def tag(name):
+	"""
+	tag NAME
+		Add tag NAME to the current working food.
+	"""
+	global g_food
+	assert(g_food)
+	g_food.add_tag(name)
+	
 
 if __name__=='__main__':
 	try:
@@ -199,15 +242,3 @@ if __name__=='__main__':
 		print(g_usage)
 		for c in g_cmds:
 			print(g_cmds[c].__doc__)
-
-
-
-
-
-
-
-
-
-
-
-

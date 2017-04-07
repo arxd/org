@@ -8,10 +8,10 @@ from PlainTxtDB import YAMLSetter, Tag
 
 class Ingredient(YAMLSetter):
 	""" An ingredient is a certain amount of food, prepared in a certain way.
-	Internally the amount is kept in grams to make things easier.  (does it make things easier?)
-		\param food is of class Food
-		\param amount is always measured in grams.
-		\param preperation might be 'sliced', 'steamed', 'sifted', etc.
+		\param food: is of class Food
+		\param amount: A floating point amount of this ingredient 
+		'param unit: The units for the amount ('cup', 'floz', etc.).  An empty string indicates pieces (2 eggs)
+		\param prep:  might be 'sliced', 'steamed', 'sifted', etc.
 	"""
 	yaml_tag = "!Ingredient"
 	yaml_props = {
@@ -79,7 +79,7 @@ class Ingredient(YAMLSetter):
 
 	def amt(self, unit=None):
 		""" Return the amount of this ingredient in units of \a unit.  
-		If you leave unit=None then it just returns the value in the current units.
+		The default unit is the internal unit used.
 		"""
 		if not unit or unit == self.unit:
 			return self.amount
@@ -137,36 +137,21 @@ class Ingredient(YAMLSetter):
 
 class Food(YAMLSetter):
 	""" A food can be an elementary food (oranges, papurika, water), or a composite recipie (spaghetti sauce, cocoa).
-	
-	All foods are measured by mass in grams.  Some foods might prefer to be counted (2 carrots, 3 eggs).  In this 
-	case you can supply \a unit_mass, which indicates the average mass (in grams) of one 'unit' of this food.  
-	Similarly, \a unit_volume allows us to calculate density and convert this unit however we need to.
-	
-	\param unit_volume : volume in milliliters of one 'unit' of this food.  Should be 1.0 if this is non-countable 
-	and usually measured by volume (e.g. Flour). 
-	
-	\param unit_mass : mass in grams of one 'unit' of this food.  Should be 1.0 if this is non-countable and 
-	usually measured by mass (e.g. Meat).
-	
-	\param tags : Tags is an optional set of categories to put this object into.  (e.g. 'dessert', 'sauce', 'christmas')
-	
-	\param kcals, protein, carbs, are nutritional facts per gram of food.
-	
-	\param recipe : This is optional.  It allows us to create this Food from other Foods.  Delicious recursion :)
+	The food should specify its unit_mass and unit_volume so that it can be converted to any unit.
 	"""
 	yaml_tag="!Food"
 	yaml_props = {
-		'name':'',
-		'unit_mass': 1.0,
-		'unit_volume': 1.00000001,
-		'unit_label': '',
-		'kcals': -1,
-		'protein': -1,
-		'carbs': -1,
-		'tags': [],
-		'description': '',
-		'ingredients': [],
-		'instructions': [],
+		'name':'',  #A uniqe short name of the food.
+		'unit_mass': 1.0, # amount of mass per 'unit_label'
+		'unit_volume': 1.00000001, # Amount of volume per 'unit_label'
+		'unit_label': '', # The units to count this food by (e.g.  'stick' of butter)
+		'kcals': -1,  # kCalories per gram of this food (-1 means unknown)
+		'protein': -1, # protein per gram of this food (-1 means unknown)
+		'carbs': -1, # carbs per gram of this food (-1 means unknown)
+		'tags': [], # A list of tags for categorizing this food
+		'description': '', #A longer description of the food
+		'ingredients': [], # A list of type <Ingredient>
+		'instructions': [], #A simple list of strings describing how to combine the ingredients.
 	}
 	
 	def __init__(self, **kwargs):
@@ -176,18 +161,22 @@ class Food(YAMLSetter):
 		return self.name == str(other)
 	
 	def has_tag(self, tagname):
+		""" tagname should be all caps"""
 		return tagname in self.tags
 		
 	def add_ingredient(self, food, amt_str='0.0 g', prep=""):
+		""" Add a new ingredient to this food """
 		ig = Ingredient(food=food, prep=prep)
 		ig.set(amt_str)
 		self.ingredients.append(ig)
 		self.add_tag('recipe')
 	
 	def clear_tags(self):
+		""" Delete all the tags.  But retain the <RECIPE> tag if we are a recipe. """
 		self.tags = ['RECIPE'] if len(self.ingredients) else []
 	
 	def add_tag(self, tagname):
+		""" Add a new tag.  It is cleaned up and uppercased for you.  A duplicate tag will not be added."""
 		if not tagname.strip():
 			raise Exception("No Null tags")
 		for i in Tag.OPS + ['(', ')']:

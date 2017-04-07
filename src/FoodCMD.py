@@ -1,7 +1,13 @@
 #!/usr/bin/python3
+"""
+This is a list of @cmd commands.  They are invoked automatically
+by reading the command line arguments.  Multiple commands can
+be called if listed sequentially on the command line.
+"""
+
 import sys
-from PlainTxtDB import DB
-from Food import *
+from PlainTxtDB import DB, Tag
+from Food import Ingredient, Food
 
 g_usage = """
 USAGE:
@@ -34,6 +40,9 @@ g_foods = None
 g_food = None
 
 def cmd(func):
+	""" This is a decorator that wraps a function and adds it to the
+	global list of commands g_cmds.
+	"""
 	def do_cmd(args, kvargs):
 		print("\n_____%s %s %s\n"%(func.__name__, args, kvargs))
 		func(*args, **kvargs)
@@ -42,6 +51,7 @@ def cmd(func):
 	do_cmd.__doc__ = func.__doc__
 	g_cmds[func.__name__] = do_cmd
 	return func
+
 
 @cmd
 def set(attr, value):
@@ -58,8 +68,7 @@ def set(attr, value):
 		  * description
 	"""
 	global g_food
-	if not g_food:
-		raise Exception("You must select a food first.  use cmd 'food' before 'set'")
+	if not g_food: raise Exception("You must select a food first.")
 	
 	if attr not in ['kcals', 'protein', 'carbs', 'unit_mass', 'unit_volume', 'unit_label', 'description']:
 		raise Exception("You cannot set attribute '%s'."%attr)
@@ -78,6 +87,7 @@ def show(factor=1.0):
 		Optionally scale the recipe by FACTOR (eg 2.0 or 0.5)
 	"""
 	global g_food
+	if not g_food: raise Exception("You must select a food first.")
 	print(g_food.scale(float(factor)).verbose())
 	
 
@@ -185,7 +195,7 @@ def ingd(food, amount, prep=""):
 		PREP is an optional preperation ("sliced", "diced", etc.)
 	"""
 	global g_food, g_foods
-	assert(g_food)
+	if not g_food: raise Exception("You must select a food first.")
 	if food not in g_foods:
 		raise Exception("'%s' is not a food"%food)
 	g_food.add_ingredient(g_foods[g_foods.index(food)], amount, prep)
@@ -197,7 +207,7 @@ def inst(text):
 		Add a new instruction to the recipe.
 	"""
 	global g_food
-	assert(g_food)
+	if not g_food: raise Exception("You must select a food first.")
 	g_food.instructions.append(text)
 	
 
@@ -208,10 +218,9 @@ def tag(name):
 		Add tag NAME to the current working food.
 	"""
 	global g_food
-	assert(g_food)
+	if not g_food: raise Exception("You must select a food first.")
 	g_food.add_tag(name)
 	
-
 if __name__=='__main__':
 	try:
 		argv = sys.argv[1:] # get rid of the name of the file
@@ -227,7 +236,6 @@ if __name__=='__main__':
 			
 			args = []
 			argkv = {}
-			#last=next_cmd
 			for i, arg in enumerate(argv[1:next_cmd]):
 				if '=' in arg:
 					k,v = arg.split('=')

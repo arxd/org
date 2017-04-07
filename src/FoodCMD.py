@@ -8,6 +8,8 @@ be called if listed sequentially on the command line.
 import sys
 from PlainTxtDB import DB, Tag
 from Food import Ingredient, Food
+from urllib.parse import quote
+from urllib.request import urlopen
 
 g_usage = """
 USAGE:
@@ -131,6 +133,7 @@ def new(name, desc=""):
 		g_food = Food(name=name, description=desc)
 		g_foods.append(g_food)
 
+
 @cmd
 def food(name):
 	"""
@@ -160,6 +163,7 @@ def delete(name):
 		print("Couldn't find '%s'"%name)
 	g_foods.remove(name)
 
+
 @cmd
 def load(dbname='db/food'):
 	"""
@@ -169,8 +173,11 @@ def load(dbname='db/food'):
 		command if missing.
 	"""
 	global g_foods, g_dbname
-	g_foods, name = DB.load(dbname)
-	g_dbname = dbname
+	try:
+		g_foods, name = DB.load(dbname)
+		g_dbname = dbname
+	except:
+		print("Couldn't load database '%s'"%dbname)
 
 
 @cmd
@@ -186,6 +193,7 @@ def save(dbname=None):
 	g_dbname = dbname
 	DB.save(g_foods, g_dbname)
 
+
 @cmd
 def ingd(food, amount, prep=""):
 	"""
@@ -199,7 +207,8 @@ def ingd(food, amount, prep=""):
 	if food not in g_foods:
 		raise Exception("'%s' is not a food"%food)
 	g_food.add_ingredient(g_foods[g_foods.index(food)], amount, prep)
-	
+
+
 @cmd
 def inst(text):
 	"""
@@ -220,7 +229,36 @@ def tag(name):
 	global g_food
 	if not g_food: raise Exception("You must select a food first.")
 	g_food.add_tag(name)
+
+
+@cmd
+def usda(search):
+	"""
+	usda SEARCH
+		Search the USDA food database for SEARCH.
+	"""
+	searchquote = quote(search)
+	print(searchquote)
 	
+	resp = urlopen("https://ndb.nal.usda.gov/ndb/search/list?" + '&'.join([
+			"qlookup=%s"%searchquote, 
+			"ds=Standard+Reference"]))
+	if resp.status != 200:
+		raise Exception("URL Error %s: %s"%(resp.status, resp.reason))
+	body = resp.read()
+	print(body)
+	# TODO
+	
+
+@cmd
+def help():
+	"""
+	help
+		Print this help
+	"""
+	raise KeyError("You need help")
+
+
 if __name__=='__main__':
 	try:
 		argv = sys.argv[1:] # get rid of the name of the file
@@ -248,5 +286,5 @@ if __name__=='__main__':
 			
 	except (KeyError, IndexError, TypeError) as  e:
 		print(g_usage)
-		for c in g_cmds:
+		for c in sorted(g_cmds.keys()):
 			print(g_cmds[c].__doc__)

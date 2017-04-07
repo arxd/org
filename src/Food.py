@@ -203,6 +203,12 @@ class Food(YAMLSetter):
 			i *= factor
 		return self
 	
+	def ingredients_str(self):
+		if not self.ingredients:
+			return ""
+		max_name = max(map(lambda x: len(str(x)), self.ingredients))
+		return '\n'.join(map(lambda s: '   %s%s | %s   %s'%(' '*(max_name-len(str(s))), s, s.str_amt(), s.prep), self.ingredients ))
+
 	def verbose(self):
 		title = "%s %s\n"%(self.name, ' : '+self.description if self.description else '')
 		astr = '='*len(title) + '\n%s'%title + '-'*len(title)
@@ -210,8 +216,7 @@ class Food(YAMLSetter):
 			astr += '\n<' + '> <'.join(self.tags) + '>\n'
 		if self.ingredients:
 			astr += "\nIngredients:\n"
-			max_name = max(map(lambda x: len(str(x)), self.ingredients))
-			astr += '\n'.join(map(lambda s: '   %s%s | %s   %s'%(' '*(max_name-len(str(s))), s, s.str_amt(), s.prep), self.ingredients ))
+			astr += self.ingredients_str()
 		if self.instructions:
 			astr += '\n\n' + '\n'.join(map(lambda s: '  * '+s, self.instructions)) + '\n'
 	

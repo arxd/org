@@ -195,9 +195,6 @@ class Food(YAMLSetter):
 			i *= factor
 		return self
 	
-	def is_recipe(self):
-		return len(self.ingredients) > 0
-	
 	def verbose(self):
 		title = "%s %s\n"%(self.name, ' : '+self.description if self.description else '')
 		astr = '='*len(title) + '\n%s'%title + '-'*len(title)

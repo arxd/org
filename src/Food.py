@@ -108,6 +108,9 @@ class Ingredient(YAMLSetter):
 		if not unit:
 			unit = self.unit
 		amt = self.amt(unit)
+		if unit in ['g', 'ml', 'oz']: # These should not be fractionalized
+			return "%.1f %s"%(amt, unit)
+		# Otherwise, turn amt into a fraction
 		whole, part = divmod(amt, 1)
 		if part > 0.875:
 			whole += 1
@@ -181,7 +184,12 @@ class Food(YAMLSetter):
 		self.ingredients.append(ig)
 		self.add_tag('recipe')
 	
+	def clear_tags(self):
+		self.tags = ['RECIPE'] if len(self.ingredients) else []
+	
 	def add_tag(self, tagname):
+		if not tagname.strip():
+			raise Exception("No Null tags")
 		for i in Tag.OPS + ['(', ')']:
 			if i in tagname:
 				raise Exception("'%s' cannot be in a tagname"%i)

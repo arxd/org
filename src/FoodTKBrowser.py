@@ -1,7 +1,7 @@
-
+#!/usr/bin/python3
 import tkinter as tk
 import sys
-from PlainTxtDB import DB
+from PlainTxtDB import DB, Tag
 from Food import *
 
 class LabelEdit(object):
@@ -30,14 +30,17 @@ class LabelEdit(object):
 		setattr(self.food, self.name, value)
 		return True
 
-
 class TagsEdit(LabelEdit):
 	def update(self):
-		self.val.set(",".join(getattr(self.food, self.name)))
+		self.val.set(", ".join(getattr(self.food, self.name)))
 		
 	def on_change(self, value):
-		tags = [x.strip() for x in value.split(',') if x.strip()]
-		setattr(self.food, self.name, tags)
+		self.food.clear_tags()
+		for t in value.split(','):
+			try:
+				self.food.add_tag(t)
+			except:
+				pass
 		return True
 		
 		
@@ -111,18 +114,38 @@ class FoodList(tk.Frame):
 	def __init__(self, parent, foods, **kwargs):
 		tk.Frame.__init__(self, parent, **kwargs)
 		self.foods = foods
+		self.filter_expr = []
+		self.search = tk.StringVar()
+		self.entry = tk.Entry(self)
+		self.entry['textvariable'] = self.search
+		self.entry['validate'] = 'all'
+		self.entry['validatecommand'] = (self.register(getattr(self, 'on_search')), '%P')
+		self.entry.grid(row=0, column=0, columnspan=2, sticky=tk.W+tk.E)
 		
-		self.rowconfigure(0, weight=1)
+		self.rowconfigure(1, weight=1)
 		self.columnconfigure(0, weight=1)
 		yScroll = tk.Scrollbar(self, orient=tk.VERTICAL)
-		yScroll.grid(row=0, column=1, sticky=tk.N+tk.S)
+		yScroll.grid(row=1, column=1, sticky=tk.N+tk.S)
 		self.all = tk.Listbox(self, yscrollcommand=yScroll.set)
-		self.all.grid(row=0, column=0, sticky=tk.NE+tk.SW)
+		self.all.grid(row=1, column=0, sticky=tk.NE+tk.SW)
 		yScroll['command'] = self.all.yview
-		
-		for f in self.foods:
-			self.all.insert(tk.END, f.name)
+		self.refresh_list()
 
+	def on_search(self, value):
+		try:
+			self.filter_expr = Tag.parse(value)
+			self.entry['fg'] = 'black'
+			self.refresh_list()
+		except:
+			self.entry['fg'] = 'red'
+		return True
+	
+	def refresh_list(self):
+		self.all.delete(0, tk.END)
+		for f in Tag.filter(self.foods, self.filter_expr):
+			self.all.insert(tk.END, f.name)
+	
+	
 	def select(self, afood):
 		idx = self.foods.index(afood)
 		self.all.selection_clear(0, tk.END)

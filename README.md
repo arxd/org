@@ -1,11 +1,5 @@
 # org
-Organize Everything
-
-Things to organize
- * Pictures
- * Money
- * Health
- * Food
+An example of using plain text files (YAML) as a database with python.
 
 # Getting Started
 Start with a fresh cloned repository:
